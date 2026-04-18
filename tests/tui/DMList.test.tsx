@@ -5,8 +5,6 @@ import { DMList } from "../../src/tui/DMList.js";
 import type { DM } from "../../src/store/types.js";
 
 const dm = (over: Partial<DM> & { id: string; name: string }): DM => ({
-  id: over.id,
-  name: over.name,
   isGroup: false,
   memberCount: 1,
   lastActivityAt: 0,

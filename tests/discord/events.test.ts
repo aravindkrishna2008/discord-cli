@@ -1,0 +1,94 @@
+import { describe, it, expect } from "vitest";
+import { normalizeMessage, normalizeChannel } from "../../src/discord/events.js";
+
+describe("normalizeMessage", () => {
+  it("maps raw selfbot message to store Message (array attachments)", () => {
+    const out = normalizeMessage({
+      id: "m1",
+      channelId: "c1",
+      author: { id: "u1", username: "alice", globalName: "Alice" },
+      content: "hi",
+      createdTimestamp: 1000,
+      attachments: [
+        { id: "a1", name: "pic.png", url: "https://x", contentType: "image/png", size: 10 },
+      ],
+    });
+    expect(out).toEqual({
+      id: "m1",
+      channelId: "c1",
+      authorId: "u1",
+      authorName: "Alice",
+      content: "hi",
+      createdAt: 1000,
+      attachments: [
+        { id: "a1", name: "pic.png", url: "https://x", contentType: "image/png", size: 10 },
+      ],
+    });
+  });
+
+  it("falls back to username when globalName is missing", () => {
+    const out = normalizeMessage({
+      id: "m1",
+      channelId: "c1",
+      author: { id: "u1", username: "alice" },
+      content: "hi",
+      createdTimestamp: 1,
+      attachments: [],
+    });
+    expect(out.authorName).toBe("alice");
+  });
+
+  it("names unnamed attachments 'file'", () => {
+    const out = normalizeMessage({
+      id: "m1",
+      channelId: "c1",
+      author: { id: "u1", username: "alice" },
+      content: "",
+      createdTimestamp: 1,
+      attachments: [{ id: "a1", name: null, url: "u", contentType: null, size: 0 }],
+    });
+    expect(out.attachments[0].name).toBe("file");
+  });
+});
+
+describe("normalizeChannel", () => {
+  it("names a 1:1 DM after the other recipient", () => {
+    const dm = normalizeChannel({
+      id: "c1",
+      type: "DM",
+      name: null,
+      recipient: { username: "bob", globalName: "Bob" },
+      lastMessageTimestamp: 42,
+    });
+    expect(dm).toEqual({
+      id: "c1",
+      name: "Bob",
+      isGroup: false,
+      memberCount: 1,
+      lastActivityAt: 42,
+      unread: false,
+    });
+  });
+
+  it("uses the group's own name (or '(group)' if null) and member count", () => {
+    const dm = normalizeChannel({
+      id: "c2",
+      type: "GROUP_DM",
+      name: "study-group",
+      recipients: { size: 3 },
+    });
+    expect(dm.isGroup).toBe(true);
+    expect(dm.name).toBe("study-group");
+    expect(dm.memberCount).toBe(3);
+  });
+
+  it("falls back to '(group)' when group has no name", () => {
+    const dm = normalizeChannel({
+      id: "c3",
+      type: "GROUP_DM",
+      name: null,
+      recipients: { size: 4 },
+    });
+    expect(dm.name).toBe("(group)");
+  });
+});

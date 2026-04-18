@@ -11,6 +11,10 @@ import { selectActiveConversation, selectDmList } from "../store/selectors.js";
 import { handleKey } from "./keybinds.js";
 import { useStore } from "./useStore.js";
 import { logError } from "../errors/logger.js";
+import { loadConfig } from "../config/config.js";
+import { paths } from "../config/paths.js";
+
+const config = loadConfig(paths.configFile);
 
 interface AppProps {
   store: Store;
@@ -88,7 +92,12 @@ export function App({ store, client }: AppProps) {
       <Box>
         <DMList items={list} selectedId={state.activeDmId} focused={state.focus === "list"} filter={state.filter} />
         <Box flexDirection="column" flexGrow={1}>
-          <Conversation view={conv} title={active?.name ?? "(no DM)"} focused={state.focus === "conversation"} />
+          <Conversation
+            view={conv}
+            title={active?.name ?? "(no DM)"}
+            focused={state.focus === "conversation"}
+            imageProtocol={config.imageProtocol}
+          />
           <Input
             mode={mode}
             value={buffer}

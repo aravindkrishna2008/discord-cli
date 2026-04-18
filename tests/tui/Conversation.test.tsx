@@ -26,13 +26,13 @@ const view = (messages: Message[], extra: Partial<ConversationView> = {}): Conve
 
 describe("Conversation", () => {
   it("renders empty-state text", () => {
-    const { lastFrame } = render(<Conversation view={null} title="alice" focused />);
+    const { lastFrame } = render(<Conversation view={null} title="alice" focused imageProtocol="none" />);
     expect(lastFrame()).toContain("no messages");
   });
 
   it("renders author, time, and content", () => {
     const { lastFrame } = render(
-      <Conversation view={view([msg({ id: "m1", content: "hey" })])} title="alice" focused />,
+      <Conversation view={view([msg({ id: "m1", content: "hey" })])} title="alice" focused imageProtocol="none" />,
     );
     const frame = lastFrame()!;
     expect(frame).toContain("alice");
@@ -47,7 +47,7 @@ describe("Conversation", () => {
         { id: "a", name: "pic.png", url: "u", contentType: "image/png", size: 2048 },
       ],
     });
-    const { lastFrame } = render(<Conversation view={view([m])} title="alice" focused />);
+    const { lastFrame } = render(<Conversation view={view([m])} title="alice" focused imageProtocol="none" />);
     expect(lastFrame()).toContain("[image: pic.png");
   });
 
@@ -57,6 +57,7 @@ describe("Conversation", () => {
         view={view([msg({ id: "m1" })], { loadingOlder: true })}
         title="alice"
         focused
+        imageProtocol="none"
       />,
     );
     expect(lastFrame()).toContain("loading older messages");
@@ -68,6 +69,7 @@ describe("Conversation", () => {
         view={view([msg({ id: "m1" })], { scrollOffsetFromBottom: 5, pendingNewCount: 2 })}
         title="alice"
         focused
+        imageProtocol="none"
       />,
     );
     expect(lastFrame()).toContain("2 new messages");

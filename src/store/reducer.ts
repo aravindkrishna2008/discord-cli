@@ -1,4 +1,31 @@
-import { type Action, type State, initialState } from "./types.js";
+import {
+  type Action,
+  type ConversationView,
+  type Message,
+  type State,
+  initialState,
+} from "./types.js";
+
+function ensureConversation(state: State, channelId: string): ConversationView {
+  return (
+    state.conversations[channelId] ?? {
+      messages: [],
+      oldestFetchedId: null,
+      reachedBeginning: false,
+      loadingOlder: false,
+      scrollOffsetFromBottom: 0,
+      pendingNewCount: 0,
+    }
+  );
+}
+
+function setConversation(state: State, channelId: string, conv: ConversationView): State {
+  return { ...state, conversations: { ...state.conversations, [channelId]: conv } };
+}
+
+function sortByCreatedAt(msgs: Message[]): Message[] {
+  return [...msgs].sort((a, b) => a.createdAt - b.createdAt);
+}
 
 export function reduce(state: State, action: Action): State {
   switch (action.type) {
@@ -45,6 +72,64 @@ export function reduce(state: State, action: Action): State {
 
     case "sendError/set":
       return { ...state, sendError: action.message };
+
+    case "messages/appendLive": {
+      const conv = ensureConversation(state, action.message.channelId);
+      if (conv.messages.some((m) => m.id === action.message.id)) return state;
+      const messages = [...conv.messages, action.message];
+      const scrolledUp = conv.scrollOffsetFromBottom > 0;
+      return setConversation(state, action.message.channelId, {
+        ...conv,
+        messages,
+        pendingNewCount: scrolledUp ? conv.pendingNewCount + 1 : 0,
+      });
+    }
+
+    case "messages/appendHistory": {
+      const conv = ensureConversation(state, action.channelId);
+      const merged = sortByCreatedAt([
+        ...conv.messages,
+        ...action.messages.filter((m) => !conv.messages.some((c) => c.id === m.id)),
+      ]);
+      return setConversation(state, action.channelId, {
+        ...conv,
+        messages: merged,
+        oldestFetchedId: merged[0]?.id ?? null,
+      });
+    }
+
+    case "messages/prependHistory": {
+      const conv = ensureConversation(state, action.channelId);
+      const older = action.messages.filter((m) => !conv.messages.some((c) => c.id === m.id));
+      const merged = sortByCreatedAt([...older, ...conv.messages]);
+      return setConversation(state, action.channelId, {
+        ...conv,
+        messages: merged,
+        oldestFetchedId: merged[0]?.id ?? conv.oldestFetchedId,
+        reachedBeginning: action.reachedBeginning,
+        loadingOlder: false,
+      });
+    }
+
+    case "messages/setLoadingOlder": {
+      const conv = ensureConversation(state, action.channelId);
+      return setConversation(state, action.channelId, { ...conv, loadingOlder: action.loading });
+    }
+
+    case "scroll/set": {
+      const conv = ensureConversation(state, action.channelId);
+      const pendingNewCount = action.offsetFromBottom === 0 ? 0 : conv.pendingNewCount;
+      return setConversation(state, action.channelId, {
+        ...conv,
+        scrollOffsetFromBottom: action.offsetFromBottom,
+        pendingNewCount,
+      });
+    }
+
+    case "scroll/consumePending": {
+      const conv = ensureConversation(state, action.channelId);
+      return setConversation(state, action.channelId, { ...conv, pendingNewCount: 0 });
+    }
 
     default:
       return state;

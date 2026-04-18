@@ -48,3 +48,88 @@ describe("reducer — connection/dms/active", () => {
     expect(s.filter).toBe("al");
   });
 });
+
+const msg = (over: Partial<Message> & { id: string }): Message => ({
+  channelId: "1",
+  authorId: "u",
+  authorName: "alice",
+  content: "hi",
+  createdAt: 0,
+  attachments: [],
+  ...over,
+});
+
+describe("reducer — messages", () => {
+  it("appendLive creates a conversation if none exists", () => {
+    const s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m1" }) });
+    expect(s.conversations["1"].messages).toHaveLength(1);
+    expect(s.conversations["1"].messages[0].id).toBe("m1");
+  });
+
+  it("appendLive dedupes by id", () => {
+    let s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m1" }) });
+    s = reduce(s, { type: "messages/appendLive", message: msg({ id: "m1" }) });
+    expect(s.conversations["1"].messages).toHaveLength(1);
+  });
+
+  it("appendLive increments pendingNewCount when scrolled up", () => {
+    let s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m1" }) });
+    s = reduce(s, { type: "scroll/set", channelId: "1", offsetFromBottom: 10 });
+    s = reduce(s, { type: "messages/appendLive", message: msg({ id: "m2" }) });
+    expect(s.conversations["1"].pendingNewCount).toBe(1);
+  });
+
+  it("appendLive leaves pendingNewCount at 0 when at bottom", () => {
+    let s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m1" }) });
+    s = reduce(s, { type: "messages/appendLive", message: msg({ id: "m2" }) });
+    expect(s.conversations["1"].pendingNewCount).toBe(0);
+  });
+
+  it("prependHistory adds older messages and updates oldestFetchedId", () => {
+    let s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m5" }) });
+    s = reduce(s, {
+      type: "messages/prependHistory",
+      channelId: "1",
+      messages: [msg({ id: "m1" }), msg({ id: "m2" })],
+      reachedBeginning: false,
+    });
+    expect(s.conversations["1"].messages.map((m) => m.id)).toEqual(["m1", "m2", "m5"]);
+    expect(s.conversations["1"].oldestFetchedId).toBe("m1");
+    expect(s.conversations["1"].reachedBeginning).toBe(false);
+  });
+
+  it("prependHistory marks reachedBeginning when fewer than requested return", () => {
+    const s = reduce(initialState, {
+      type: "messages/prependHistory",
+      channelId: "1",
+      messages: [msg({ id: "m1" })],
+      reachedBeginning: true,
+    });
+    expect(s.conversations["1"].reachedBeginning).toBe(true);
+  });
+
+  it("appendHistory seeds a conversation from initial fetch", () => {
+    const s = reduce(initialState, {
+      type: "messages/appendHistory",
+      channelId: "1",
+      messages: [msg({ id: "m1" }), msg({ id: "m2" })],
+    });
+    expect(s.conversations["1"].messages).toHaveLength(2);
+    expect(s.conversations["1"].oldestFetchedId).toBe("m1");
+  });
+
+  it("scroll/consumePending resets counter", () => {
+    let s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m1" }) });
+    s = reduce(s, { type: "scroll/set", channelId: "1", offsetFromBottom: 5 });
+    s = reduce(s, { type: "messages/appendLive", message: msg({ id: "m2" }) });
+    s = reduce(s, { type: "scroll/consumePending", channelId: "1" });
+    expect(s.conversations["1"].pendingNewCount).toBe(0);
+  });
+
+  it("setLoadingOlder toggles the flag", () => {
+    let s = reduce(initialState, { type: "messages/setLoadingOlder", channelId: "1", loading: true });
+    expect(s.conversations["1"].loadingOlder).toBe(true);
+    s = reduce(s, { type: "messages/setLoadingOlder", channelId: "1", loading: false });
+    expect(s.conversations["1"].loadingOlder).toBe(false);
+  });
+});

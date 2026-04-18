@@ -20,6 +20,11 @@ describe("DMList", () => {
         selectedId="1"
         focused
         filter=""
+        searching={false}
+        onFilterChange={() => {}}
+        onFilterSubmit={() => {}}
+        width={30}
+        height={10}
       />,
     );
     expect(lastFrame()).toContain("alice");
@@ -33,6 +38,11 @@ describe("DMList", () => {
         selectedId={null}
         focused
         filter=""
+        searching={false}
+        onFilterChange={() => {}}
+        onFilterSubmit={() => {}}
+        width={30}
+        height={10}
       />,
     );
     expect(lastFrame()).toContain("\u25CF");
@@ -45,16 +55,72 @@ describe("DMList", () => {
         selectedId={null}
         focused
         filter=""
+        searching={false}
+        onFilterChange={() => {}}
+        onFilterSubmit={() => {}}
+        width={30}
+        height={10}
       />,
     );
     expect(lastFrame()).toContain("study-group");
     expect(lastFrame()).toContain("(3)");
   });
 
-  it("shows filter prompt when filter is non-empty", () => {
+  it("shows the search query when filter is non-empty", () => {
     const { lastFrame } = render(
-      <DMList items={[]} selectedId={null} focused filter="ali" />,
+      <DMList
+        items={[]}
+        selectedId={null}
+        focused
+        filter="ali"
+        searching={false}
+        onFilterChange={() => {}}
+        onFilterSubmit={() => {}}
+        width={30}
+        height={10}
+      />,
     );
-    expect(lastFrame()).toContain("/ali");
+    expect(lastFrame()).toContain("ali");
+  });
+
+  it("shows the search placeholder when there is no query", () => {
+    const { lastFrame } = render(
+      <DMList
+        items={[]}
+        selectedId={null}
+        focused
+        filter=""
+        searching={false}
+        onFilterChange={() => {}}
+        onFilterSubmit={() => {}}
+        width={30}
+        height={10}
+      />,
+    );
+    expect(lastFrame()).toContain("search by name");
+  });
+
+  it("keeps the selected DM visible within the available height", () => {
+    const { lastFrame } = render(
+      <DMList
+        items={[
+          dm({ id: "1", name: "alice" }),
+          dm({ id: "2", name: "bob" }),
+          dm({ id: "3", name: "carol" }),
+          dm({ id: "4", name: "dave" }),
+        ]}
+        selectedId="4"
+        focused
+        filter=""
+        searching={false}
+        onFilterChange={() => {}}
+        onFilterSubmit={() => {}}
+        width={30}
+        height={6}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("dave");
+    expect(frame).not.toContain("alice");
   });
 });

@@ -5,8 +5,9 @@ export function selectDmList(state: State): DM[] {
   const all = Object.values(state.dms);
   const filtered = filter ? all.filter((d) => d.name.toLowerCase().includes(filter)) : all;
   return filtered.sort((a, b) => {
-    if (a.unread !== b.unread) return a.unread ? -1 : 1;
-    return b.lastActivityAt - a.lastActivityAt;
+    const activityDiff = b.lastActivityAt - a.lastActivityAt;
+    if (activityDiff !== 0) return activityDiff;
+    return a.name.localeCompare(b.name);
   });
 }
 

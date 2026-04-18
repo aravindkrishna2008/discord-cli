@@ -1,11 +1,16 @@
 import type { Key } from "ink";
 import type { Action, State } from "../store/types.js";
 import { selectDmList } from "../store/selectors.js";
+import { isAtTopOfLoadedMessages } from "./conversation-window.js";
 
 export interface KeyContext {
   input: string;
   key: Key;
   state: State;
+  conversationLayout?: {
+    contentWidth: number;
+    messageRows: number;
+  };
 }
 
 export interface KeyOutcome {
@@ -16,7 +21,7 @@ export interface KeyOutcome {
 }
 
 export function handleKey(ctx: KeyContext): KeyOutcome {
-  const { input, key, state } = ctx;
+  const { input, key, state, conversationLayout } = ctx;
   const out: KeyOutcome = { actions: [] };
 
   if (input === "q") {
@@ -56,11 +61,41 @@ export function handleKey(ctx: KeyContext): KeyOutcome {
     out.enterInsert = true;
     return out;
   }
-  if ((input === "k" || key.upArrow) && state.activeDmId) {
-    const conv = state.conversations[state.activeDmId];
-    if (conv && !conv.reachedBeginning && !conv.loadingOlder && conv.oldestFetchedId) {
-      out.loadOlder = { channelId: state.activeDmId };
+  if (!state.activeDmId) return out;
+  const conv = state.conversations[state.activeDmId];
+  if (!conv) return out;
+
+  if (input === "j" || key.downArrow) {
+    if (conv.scrollOffsetFromBottom > 0) {
+      out.actions.push({
+        type: "scroll/set",
+        channelId: state.activeDmId,
+        offsetFromBottom: conv.scrollOffsetFromBottom - 1,
+      });
     }
+    return out;
+  }
+
+  if (input === "k" || key.upArrow) {
+    const atTopOfLoadedMessages = conversationLayout
+      ? isAtTopOfLoadedMessages(
+          conv.messages,
+          conversationLayout.contentWidth,
+          conversationLayout.messageRows,
+          conv.scrollOffsetFromBottom,
+        )
+      : conv.scrollOffsetFromBottom >= Math.max(0, conv.messages.length - 1);
+    if (atTopOfLoadedMessages) {
+      if (!conv.reachedBeginning && !conv.loadingOlder && conv.oldestFetchedId) {
+        out.loadOlder = { channelId: state.activeDmId };
+      }
+      return out;
+    }
+    out.actions.push({
+      type: "scroll/set",
+      channelId: state.activeDmId,
+      offsetFromBottom: conv.scrollOffsetFromBottom + 1,
+    });
   }
   return out;
 }

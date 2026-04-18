@@ -34,6 +34,11 @@ export function createDiscordClient(): DiscordClient {
         dmChannels.push(normalizeChannel(ch as unknown as RawChannel));
       }
     }
+    dmChannels.sort((a, b) => {
+      const activityDiff = b.lastActivityAt - a.lastActivityAt;
+      if (activityDiff !== 0) return activityDiff;
+      return a.name.localeCompare(b.name);
+    });
     handlers.dms?.(dmChannels);
     handlers.connectionChange?.("connected");
   });

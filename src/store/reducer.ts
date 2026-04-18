@@ -27,6 +27,18 @@ function sortByCreatedAt(msgs: Message[]): Message[] {
   return [...msgs].sort((a, b) => a.createdAt - b.createdAt);
 }
 
+function setDmLastActivity(state: State, channelId: string, lastActivityAt: number): State {
+  const dm = state.dms[channelId];
+  if (!dm || dm.lastActivityAt >= lastActivityAt) return state;
+  return {
+    ...state,
+    dms: {
+      ...state.dms,
+      [channelId]: { ...dm, lastActivityAt },
+    },
+  };
+}
+
 export function reduce(state: State, action: Action): State {
   switch (action.type) {
     case "connection/set":
@@ -78,11 +90,12 @@ export function reduce(state: State, action: Action): State {
       if (conv.messages.some((m) => m.id === action.message.id)) return state;
       const messages = [...conv.messages, action.message];
       const scrolledUp = conv.scrollOffsetFromBottom > 0;
-      return setConversation(state, action.message.channelId, {
+      const nextState = setConversation(state, action.message.channelId, {
         ...conv,
         messages,
         pendingNewCount: scrolledUp ? conv.pendingNewCount + 1 : 0,
       });
+      return setDmLastActivity(nextState, action.message.channelId, action.message.createdAt);
     }
 
     case "messages/appendHistory": {
@@ -91,24 +104,26 @@ export function reduce(state: State, action: Action): State {
         ...conv.messages,
         ...action.messages.filter((m) => !conv.messages.some((c) => c.id === m.id)),
       ]);
-      return setConversation(state, action.channelId, {
+      const nextState = setConversation(state, action.channelId, {
         ...conv,
         messages: merged,
         oldestFetchedId: merged[0]?.id ?? null,
       });
+      return setDmLastActivity(nextState, action.channelId, merged.at(-1)?.createdAt ?? 0);
     }
 
     case "messages/prependHistory": {
       const conv = ensureConversation(state, action.channelId);
       const older = action.messages.filter((m) => !conv.messages.some((c) => c.id === m.id));
       const merged = sortByCreatedAt([...older, ...conv.messages]);
-      return setConversation(state, action.channelId, {
+      const nextState = setConversation(state, action.channelId, {
         ...conv,
         messages: merged,
         oldestFetchedId: merged[0]?.id ?? conv.oldestFetchedId,
         reachedBeginning: action.reachedBeginning,
         loadingOlder: false,
       });
+      return setDmLastActivity(nextState, action.channelId, merged.at(-1)?.createdAt ?? 0);
     }
 
     case "messages/setLoadingOlder": {

@@ -26,13 +26,22 @@ const view = (messages: Message[], extra: Partial<ConversationView> = {}): Conve
 
 describe("Conversation", () => {
   it("renders empty-state text", () => {
-    const { lastFrame } = render(<Conversation view={null} title="alice" focused imageProtocol="none" />);
+    const { lastFrame } = render(
+      <Conversation view={null} title="alice" focused imageProtocol="none" width={40} height={10} />,
+    );
     expect(lastFrame()).toContain("no messages");
   });
 
   it("renders author, time, and content", () => {
     const { lastFrame } = render(
-      <Conversation view={view([msg({ id: "m1", content: "hey" })])} title="alice" focused imageProtocol="none" />,
+      <Conversation
+        view={view([msg({ id: "m1", content: "hey" })])}
+        title="alice"
+        focused
+        imageProtocol="none"
+        width={40}
+        height={10}
+      />,
     );
     const frame = lastFrame()!;
     expect(frame).toContain("alice");
@@ -47,7 +56,9 @@ describe("Conversation", () => {
         { id: "a", name: "pic.png", url: "u", contentType: "image/png", size: 2048 },
       ],
     });
-    const { lastFrame } = render(<Conversation view={view([m])} title="alice" focused imageProtocol="none" />);
+    const { lastFrame } = render(
+      <Conversation view={view([m])} title="alice" focused imageProtocol="none" width={40} height={10} />,
+    );
     expect(lastFrame()).toContain("[image: pic.png");
   });
 
@@ -58,6 +69,8 @@ describe("Conversation", () => {
         title="alice"
         focused
         imageProtocol="none"
+        width={40}
+        height={10}
       />,
     );
     expect(lastFrame()).toContain("loading older messages");
@@ -70,8 +83,52 @@ describe("Conversation", () => {
         title="alice"
         focused
         imageProtocol="none"
+        width={40}
+        height={10}
       />,
     );
     expect(lastFrame()).toContain("2 new messages");
+  });
+
+  it("shows the most recent messages when the pane height is limited", () => {
+    const { lastFrame } = render(
+      <Conversation
+        view={view([
+          msg({ id: "m1", content: "first" }),
+          msg({ id: "m2", content: "second" }),
+          msg({ id: "m3", content: "third" }),
+        ])}
+        title="alice"
+        focused
+        imageProtocol="none"
+        width={40}
+        height={8}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("second");
+    expect(frame).toContain("third");
+    expect(frame).not.toContain("first");
+  });
+
+  it("shows older messages when scrolled up", () => {
+    const { lastFrame } = render(
+      <Conversation
+        view={view([
+          msg({ id: "m1", content: "first" }),
+          msg({ id: "m2", content: "second" }),
+          msg({ id: "m3", content: "third" }),
+        ], { scrollOffsetFromBottom: 1 })}
+        title="alice"
+        focused
+        imageProtocol="none"
+        width={40}
+        height={8}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("first");
+    expect(frame).toContain("second");
+    expect(frame).not.toContain("third");
   });
 });

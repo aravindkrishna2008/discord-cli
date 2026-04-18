@@ -5,6 +5,8 @@ export interface LoginResult {
   username: string;
 }
 
+type PageEvaluator = Pick<Page, "evaluate">;
+
 export async function loginViaBrowser(): Promise<LoginResult> {
   let browser: Browser | null = null;
   try {
@@ -15,34 +17,37 @@ export async function loginViaBrowser(): Promise<LoginResult> {
     await page.waitForURL("https://discord.com/channels/@me", { timeout: 0 });
     const token = await extractToken(page);
     if (!token) throw new Error("could not extract token from browser session");
-    const username = await page
-      .evaluate(() => {
-        const raw = window.localStorage.getItem("user");
-        if (!raw) return null;
-        try {
-          return (JSON.parse(raw) as { username?: string }).username ?? null;
-        } catch {
-          return null;
-        }
-      })
-      .catch(() => null);
+    const username = await extractUsername(page);
     return { token, username: username ?? "unknown" };
   } finally {
     await browser?.close().catch(() => undefined);
   }
 }
 
-async function extractToken(page: Page): Promise<string | null> {
-  const viaLocal = await page.evaluate(() => {
-    const t = window.localStorage.getItem("token");
-    return typeof t === "string" ? t.replace(/^"|"$/g, "") : null;
-  });
+export async function extractUsername(page: PageEvaluator): Promise<string | null> {
+  const raw = await readLocalStorageValue(page, "user");
+  if (!raw) return null;
+  try {
+    return (JSON.parse(raw) as { username?: string }).username ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function extractToken(page: PageEvaluator): Promise<string | null> {
+  const viaLocal = normalizeStoredToken(await readLocalStorageValue(page, "token"));
   if (viaLocal) return viaLocal;
 
-  return await page.evaluate(
+  return normalizeStoredToken(
+    await page.evaluate(
     () =>
       new Promise<string | null>((resolve) => {
-        const req = indexedDB.open("cookieStorage");
+        const idb = globalThis.indexedDB;
+        if (!idb || typeof idb.open !== "function") {
+          resolve(null);
+          return;
+        }
+        const req = idb.open("cookieStorage");
         req.onerror = () => resolve(null);
         req.onsuccess = () => {
           const db = req.result;
@@ -58,6 +63,7 @@ async function extractToken(page: Page): Promise<string | null> {
           };
         };
       }),
+    ),
   );
 }
 
@@ -69,4 +75,22 @@ export async function chromiumAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function readLocalStorageValue(page: PageEvaluator, key: string): Promise<string | null> {
+  return await page.evaluate((storageKey) => {
+    try {
+      const storage = globalThis.localStorage;
+      if (!storage || typeof storage.getItem !== "function") return null;
+      const value = storage.getItem(storageKey);
+      return typeof value === "string" ? value : null;
+    } catch {
+      return null;
+    }
+  }, key);
+}
+
+function normalizeStoredToken(value: string | null): string | null {
+  if (!value) return null;
+  return value.replace(/^"|"$/g, "");
 }

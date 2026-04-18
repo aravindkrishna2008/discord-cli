@@ -85,6 +85,12 @@ describe("reducer — messages", () => {
     expect(s.conversations["1"].pendingNewCount).toBe(0);
   });
 
+  it("appendLive updates DM activity timestamps", () => {
+    let s = reduce(initialState, { type: "dms/upsertMany", dms: [dm({ id: "1", lastActivityAt: 10 })] });
+    s = reduce(s, { type: "messages/appendLive", message: msg({ id: "m2", createdAt: 20 }) });
+    expect(s.dms["1"].lastActivityAt).toBe(20);
+  });
+
   it("prependHistory adds older messages and updates oldestFetchedId", () => {
     let s = reduce(initialState, { type: "messages/appendLive", message: msg({ id: "m5" }) });
     s = reduce(s, {
@@ -109,13 +115,14 @@ describe("reducer — messages", () => {
   });
 
   it("appendHistory seeds a conversation from initial fetch", () => {
-    const s = reduce(initialState, {
+    const s = reduce(reduce(initialState, { type: "dms/upsertMany", dms: [dm({ id: "1" })] }), {
       type: "messages/appendHistory",
       channelId: "1",
-      messages: [msg({ id: "m1" }), msg({ id: "m2" })],
+      messages: [msg({ id: "m1", createdAt: 10 }), msg({ id: "m2", createdAt: 20 })],
     });
     expect(s.conversations["1"].messages).toHaveLength(2);
     expect(s.conversations["1"].oldestFetchedId).toBe("m1");
+    expect(s.dms["1"].lastActivityAt).toBe(20);
   });
 
   it("scroll/consumePending resets counter", () => {

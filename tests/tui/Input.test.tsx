@@ -6,7 +6,7 @@ import { Input } from "../../src/tui/Input.js";
 describe("Input", () => {
   it("shows prompt placeholder in normal mode", () => {
     const { lastFrame } = render(
-      <Input mode="normal" value="" sendError={null} onChange={() => {}} onSubmit={() => {}} />,
+      <Input mode="normal" value="" sendError={null} width={40} onChange={() => {}} onSubmit={() => {}} />,
     );
     expect(lastFrame()).toContain("press i to type");
   });
@@ -17,6 +17,7 @@ describe("Input", () => {
         mode="insert"
         value="hello"
         sendError={null}
+        width={40}
         onChange={() => {}}
         onSubmit={() => {}}
       />,
@@ -30,6 +31,7 @@ describe("Input", () => {
         mode="insert"
         value=""
         sendError="nope"
+        width={40}
         onChange={() => {}}
         onSubmit={() => {}}
       />,

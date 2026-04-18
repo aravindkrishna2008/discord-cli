@@ -18,7 +18,7 @@ Requires Node 20+.
 ## Usage
 
 ```sh
-discord-cli login            # headed Chromium, auto-extracts token
+discord-cli login            # headed Chromium, auto-extracts token, the current implementation does not work
 discord-cli login --manual   # paste a token instead
 discord-cli                  # launch the TUI
 discord-cli logout           # delete the stored token

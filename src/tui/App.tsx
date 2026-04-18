@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, render as inkRender, useApp, useInput } from "ink";
 import { createStore, type Store } from "../store/store.js";
 import type { DiscordClient } from "../discord/client.js";
@@ -67,6 +67,19 @@ export function App({ store, client }: AppProps) {
     }
     if (out.exit) exit();
   });
+
+  useEffect(() => {
+    if (!state.activeDmId) return;
+    const conv = state.conversations[state.activeDmId];
+    if (conv && conv.messages.length > 0) return;
+    const id = state.activeDmId;
+    client
+      .fetchHistory(id, undefined, 50)
+      .then((messages) => {
+        store.dispatch({ type: "messages/appendHistory", channelId: id, messages });
+      })
+      .catch((e) => logError("fetchHistory:initial", e));
+  }, [state.activeDmId]);
 
   const active = state.activeDmId ? state.dms[state.activeDmId] : null;
 

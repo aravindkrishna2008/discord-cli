@@ -1,0 +1,37 @@
+{
+  "name": "discord-cli",
+  "version": "0.1.0",
+  "description": "Terminal Discord client for DMs",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "discord-cli": "dist/bin/discord-cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsx bin/discord-cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "discord.js-selfbot-v13": "^3.5.0",
+    "ink": "^5.0.1",
+    "ink-text-input": "^6.0.0",
+    "playwright": "^1.49.0",
+    "react": "^18.3.1",
+    "terminal-image": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "ink-testing-library": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

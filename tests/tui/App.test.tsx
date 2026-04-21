@@ -14,6 +14,9 @@ function fakeClient() {
         calls.push({ kind: "login", args: [token] });
       },
       async logout() {},
+      async listDms() {
+        return [];
+      },
       async fetchHistory() {
         return [] as Message[];
       },

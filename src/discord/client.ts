@@ -14,6 +14,7 @@ export interface DiscordEvents {
 export interface DiscordClient {
   login(token: string): Promise<void>;
   logout(): Promise<void>;
+  listDms(): Promise<DM[]>;
   fetchHistory(channelId: string, beforeId?: string, limit?: number): Promise<Message[]>;
   send(channelId: string, content: string): Promise<void>;
   on<K extends keyof DiscordEvents>(event: K, handler: DiscordEvents[K]): void;
@@ -23,10 +24,7 @@ export function createDiscordClient(): DiscordClient {
   const client = new Client({ checkUpdate: false } as ConstructorParameters<typeof Client>[0]);
   const handlers: Partial<DiscordEvents> = {};
 
-  client.on("ready", () => {
-    const me = { id: client.user!.id, username: client.user!.username };
-    handlers.ready?.(me);
-
+  function collectDms(): DM[] {
     const dmChannels: DM[] = [];
     for (const [, ch] of client.channels.cache) {
       const type = (ch as { type?: string }).type;
@@ -39,7 +37,13 @@ export function createDiscordClient(): DiscordClient {
       if (activityDiff !== 0) return activityDiff;
       return a.name.localeCompare(b.name);
     });
-    handlers.dms?.(dmChannels);
+    return dmChannels;
+  }
+
+  client.on("ready", () => {
+    const me = { id: client.user!.id, username: client.user!.username };
+    handlers.ready?.(me);
+    handlers.dms?.(collectDms());
     handlers.connectionChange?.("connected");
   });
 
@@ -59,6 +63,9 @@ export function createDiscordClient(): DiscordClient {
     },
     async logout() {
       await client.destroy();
+    },
+    async listDms() {
+      return collectDms();
     },
     async fetchHistory(channelId, beforeId, limit = 50) {
       const ch = (await client.channels.fetch(channelId)) as TextBasedChannel | null;

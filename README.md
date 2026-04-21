@@ -24,6 +24,48 @@ discord-cli                  # launch the TUI
 discord-cli logout           # delete the stored token
 ```
 
+## Command Mode
+
+The command surface is shared. Direct commands and `discord-cli shell` are generated from the same command specs, and the TUI uses the same session/runtime DM actions for loading history and sending messages. If you change a command or DM operation in the shared layer, the shell, direct CLI, and terminal UI stay aligned.
+
+Use direct commands for one-shot automation:
+
+```sh
+discord-cli status --json
+discord-cli list --json
+discord-cli use "Alice" --json
+discord-cli messages 10 --dm "Alice" --json
+discord-cli send "hello" --dm "Alice" --json
+discord-cli refresh --json
+```
+
+Use shell mode when several related requests should share one Discord session:
+
+```sh
+discord-cli shell
+```
+
+Example shell session:
+
+```text
+dm> list
+dm> use Alice
+dm> messages 10
+dm> send hello
+dm> quit
+```
+
+Prefer `--channel-id` over `--dm` once a prior step has resolved the target.
+Use `discord-cli shell --json` for machine-driven sessions.
+
+### Shared implementation
+
+- Command definitions live in `src/commands/registry.ts`.
+- Direct CLI registration is derived from that metadata in `src/commands/cli.ts`.
+- Shell mode executes the same handlers through `src/shell/repl.ts`.
+- Shared DM/session behavior lives in `src/runtime/session.ts` and `src/runtime/dm-actions.ts`.
+- The Ink TUI consumes that same runtime layer instead of maintaining a separate send/history path.
+
 State lives under `~/.discord-cli/`:
 
 - `auth.json` — token + username (mode 600)

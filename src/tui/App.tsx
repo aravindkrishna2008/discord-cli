@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, render as inkRender, useApp, useInput, useStdout } from "ink";
 import { createStore, type Store } from "../store/store.js";
 import type { DiscordClient } from "../discord/client.js";
-import { createDiscordClient } from "../discord/client.js";
 import { DMList } from "./DMList.js";
 import { Conversation } from "./Conversation.js";
 import { Input } from "./Input.js";
@@ -13,6 +12,9 @@ import { useStore } from "./useStore.js";
 import { logError } from "../errors/logger.js";
 import { loadConfig } from "../config/config.js";
 import { paths } from "../config/paths.js";
+import { getImagePreviewHeight } from "../image/render.js";
+import { createSession } from "../runtime/session.js";
+import { HISTORY_PAGE_SIZE, loadDmMessages, sendDmMessage } from "../runtime/dm-actions.js";
 
 const config = loadConfig(paths.configFile);
 type Mode = "normal" | "insert" | "search";
@@ -20,9 +22,10 @@ type Mode = "normal" | "insert" | "search";
 interface AppProps {
   store: Store;
   client: DiscordClient;
+  onExit?(): void | Promise<void>;
 }
 
-export function App({ store, client }: AppProps) {
+export function App({ store, client, onExit }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const state = useStore(store, (s) => s);
@@ -49,6 +52,10 @@ export function App({ store, client }: AppProps) {
       stdout.off("resize", handleResize);
     };
   }, [stdout]);
+
+  useEffect(() => () => {
+    void onExit?.();
+  }, [onExit]);
 
   useInput((input, key) => {
     if (mode === "insert") {
@@ -78,14 +85,13 @@ export function App({ store, client }: AppProps) {
       const { channelId } = out.loadOlder;
       store.dispatch({ type: "messages/setLoadingOlder", channelId, loading: true });
       const before = state.conversations[channelId]?.oldestFetchedId ?? undefined;
-      client
-        .fetchHistory(channelId, before, 50)
+      loadDmMessages(client, { channelId, beforeId: before, limit: HISTORY_PAGE_SIZE })
         .then((older) => {
           store.dispatch({
             type: "messages/prependHistory",
             channelId,
             messages: older,
-            reachedBeginning: older.length < 50,
+            reachedBeginning: older.length < HISTORY_PAGE_SIZE,
           });
         })
         .catch((e) => logError("fetchHistory", e))
@@ -101,8 +107,7 @@ export function App({ store, client }: AppProps) {
     const conv = state.conversations[state.activeDmId];
     if (conv && conv.messages.length > 0) return;
     const id = state.activeDmId;
-    client
-      .fetchHistory(id, undefined, 50)
+    loadDmMessages(client, { channelId: id, limit: HISTORY_PAGE_SIZE })
       .then((messages) => {
         store.dispatch({ type: "messages/appendHistory", channelId: id, messages });
       })
@@ -166,7 +171,7 @@ export function App({ store, client }: AppProps) {
               const channelId = state.activeDmId;
               setBuffer("");
               setMode("normal");
-              client.send(channelId, content).catch((e) => {
+              sendDmMessage(client, { channelId, content }).catch((e) => {
                 store.dispatch({ type: "sendError/set", message: (e as Error).message });
               });
             }}
@@ -178,25 +183,39 @@ export function App({ store, client }: AppProps) {
   );
 }
 
-export async function runTui(token: string): Promise<void> {
+export async function runTui(): Promise<void> {
   const store = createStore();
-  const client = createDiscordClient();
+  const session = await createSession({
+    isShell: false,
+    outputMode: "text",
+  });
+  const client = session.context.client!;
+
+  store.dispatch({ type: "connection/set", status: "connected" });
+  store.dispatch({ type: "dms/upsertMany", dms: session.context.dms });
 
   client.on("connectionChange", (status) =>
     store.dispatch({ type: "connection/set", status }),
   );
   client.on("ready", () => store.dispatch({ type: "connection/set", status: "connected" }));
-  client.on("dms", (dms) => store.dispatch({ type: "dms/upsertMany", dms }));
+  client.on("dms", (dms) => {
+    session.context.dms = dms;
+    store.dispatch({ type: "dms/upsertMany", dms });
+  });
   client.on("message", (message) => {
     store.dispatch({ type: "messages/appendLive", message });
     if (store.getState().activeDmId !== message.channelId) {
       store.dispatch({ type: "dms/markUnread", dmId: message.channelId });
     }
   });
-  client.on("error", (e) => logError("discord.client", e));
 
-  await client.login(token);
-  inkRender(<App store={store} client={client} />);
+  inkRender(
+    <App
+      store={store}
+      client={client}
+      onExit={() => session.close().catch((e) => logError("discord.client.close", e))}
+    />,
+  );
 }
 
 function getTerminalSize(stdout: NodeJS.WriteStream): { width: number; height: number } {
@@ -217,12 +236,14 @@ function getConversationLayout(
   width: number,
   height: number,
   view: ReturnType<typeof selectActiveConversation>,
-): { contentWidth: number; messageRows: number } {
+): { contentWidth: number; messageRows: number; imagePreviewHeight: number } {
   const contentWidth = Math.max(1, width - 4);
   const loadingRows = view?.loadingOlder ? 1 : 0;
   const pendingRows = view && view.scrollOffsetFromBottom > 0 && view.pendingNewCount > 0 ? 1 : 0;
+  const messageRows = Math.max(0, height - 4 - loadingRows - pendingRows);
   return {
     contentWidth,
-    messageRows: Math.max(0, height - 4 - loadingRows - pendingRows),
+    messageRows,
+    imagePreviewHeight: getImagePreviewHeight(messageRows),
   };
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { ConversationView, Message, Attachment } from "../store/types.js";
-import { placeholderFor } from "../image/render.js";
+import { getImagePreviewHeight, placeholderFor } from "../image/render.js";
 import type { ImageProtocol } from "../config/config.js";
 import { ImageView } from "./ImageView.js";
 import { truncateText } from "./text.js";
@@ -21,12 +21,14 @@ export function Conversation({ view, title, focused, imageProtocol, width, heigh
   const loadingRows = view?.loadingOlder ? 1 : 0;
   const pendingRows = view && view.scrollOffsetFromBottom > 0 && view.pendingNewCount > 0 ? 1 : 0;
   const messageRows = Math.max(0, height - 4 - loadingRows - pendingRows);
+  const imagePreviewHeight = getImagePreviewHeight(messageRows);
   const visibleMessages = view
     ? getConversationWindow(
         view.messages,
         innerWidth,
         messageRows,
         view.scrollOffsetFromBottom,
+        imagePreviewHeight,
       ).visibleMessages
     : [];
 
@@ -46,7 +48,13 @@ export function Conversation({ view, title, focused, imageProtocol, width, heigh
         <Text color="gray">no messages</Text>
       ) : (
         visibleMessages.map((m) => (
-          <MessageLine key={m.id} m={m} imageProtocol={imageProtocol} contentWidth={innerWidth} />
+          <MessageLine
+            key={m.id}
+            m={m}
+            imageProtocol={imageProtocol}
+            contentWidth={innerWidth}
+            imagePreviewHeight={imagePreviewHeight}
+          />
         ))
       )}
       {view && view.scrollOffsetFromBottom > 0 && view.pendingNewCount > 0 ? (
@@ -60,10 +68,12 @@ function MessageLine({
   m,
   imageProtocol,
   contentWidth,
+  imagePreviewHeight,
 }: {
   m: Message;
   imageProtocol: ImageProtocol;
   contentWidth: number;
+  imagePreviewHeight: number;
 }) {
   const time = new Date(m.createdAt).toISOString().slice(11, 16);
   return (
@@ -75,7 +85,13 @@ function MessageLine({
       {m.content ? <Text>  {m.content}</Text> : null}
       {m.attachments.map((a) =>
         a.contentType?.startsWith("image/") ? (
-          <ImageView key={a.id} a={a} protocolChoice={imageProtocol} />
+          <ImageView
+            key={a.id}
+            a={a}
+            protocolChoice={imageProtocol}
+            contentWidth={contentWidth}
+            maxHeight={imagePreviewHeight}
+          />
         ) : (
           <AttachmentLine key={a.id} a={a} />
         ),

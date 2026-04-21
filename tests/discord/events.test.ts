@@ -70,6 +70,17 @@ describe("normalizeChannel", () => {
     });
   });
 
+  it("derives last activity from lastMessageId when the client omits lastMessageTimestamp", () => {
+    const dm = normalizeChannel({
+      id: "c1",
+      type: "DM",
+      name: null,
+      recipient: { username: "bob", globalName: "Bob" },
+      lastMessageId: "175928847299117063",
+    });
+    expect(dm.lastActivityAt).toBe(1462015105796);
+  });
+
   it("uses the group's own name (or '(group)' if null) and member count", () => {
     const dm = normalizeChannel({
       id: "c2",
@@ -90,5 +101,16 @@ describe("normalizeChannel", () => {
       recipients: { size: 4 },
     });
     expect(dm.name).toBe("(group)");
+  });
+
+  it("falls back to channel creation time when there are no messages yet", () => {
+    const dm = normalizeChannel({
+      id: "c4",
+      type: "GROUP_DM",
+      name: "new group",
+      recipients: { size: 2 },
+      createdTimestamp: 1234,
+    });
+    expect(dm.lastActivityAt).toBe(1234);
   });
 });

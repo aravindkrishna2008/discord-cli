@@ -6,11 +6,17 @@ import { loginViaBrowser, chromiumAvailable } from "../src/auth/playwright-login
 import { promptTokenPaste } from "../src/auth/manual-login.js";
 import { installFatalHandlers } from "../src/errors/fatal.js";
 import { runTui } from "../src/tui/App.js";
+import { registerDirectCommands } from "../src/commands/cli.js";
+import { runShell } from "../src/shell/repl.js";
 
 installFatalHandlers((code) => process.exit(code));
 
 const program = new Command();
-program.name("discord-cli").description("Terminal Discord client for DMs").version("0.1.0");
+program
+  .name("discord-cli")
+  .description("Terminal Discord client for DMs")
+  .version("0.1.0")
+  .helpCommand(false);
 
 program
   .command("login")
@@ -43,13 +49,28 @@ program
     process.stdout.write("logged out\n");
   });
 
+registerDirectCommands(program);
+
+program
+  .command("shell")
+  .description("Start a line-oriented shell for compound requests")
+  .option("--json", "Emit JSON output")
+  .option("--quiet", "Suppress the shell banner")
+  .action(async (opts) => {
+    const exitCode = await runShell({
+      outputMode: opts.json ? "json" : "text",
+      quiet: !!opts.quiet,
+    });
+    process.exit(exitCode);
+  });
+
 program.action(async () => {
   const auth = readAuth(paths.authFile);
   if (!auth) {
     process.stderr.write("Not logged in. Run 'discord-cli login' first.\n");
     process.exit(1);
   }
-  await runTui(auth.token);
+  await runTui();
 });
 
 program.parseAsync().catch((e) => {

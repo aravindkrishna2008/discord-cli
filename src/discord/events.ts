@@ -26,6 +26,23 @@ export function normalizeMessage(raw: RawMessage): Message {
   };
 }
 
+const DISCORD_EPOCH = 1420070400000n;
+
+function timestampFromSnowflake(id: string): number | null {
+  try {
+    return Number((BigInt(id) >> 22n) + DISCORD_EPOCH);
+  } catch {
+    return null;
+  }
+}
+
+function getChannelLastActivity(raw: RawChannel): number {
+  if (typeof raw.lastMessageTimestamp === "number") return raw.lastMessageTimestamp;
+  if (typeof raw.lastMessageId === "string") return timestampFromSnowflake(raw.lastMessageId) ?? 0;
+  if (typeof raw.createdTimestamp === "number") return raw.createdTimestamp;
+  return 0;
+}
+
 export function normalizeChannel(raw: RawChannel): DM {
   const isGroup = raw.type === "GROUP_DM";
   const name = isGroup
@@ -37,7 +54,7 @@ export function normalizeChannel(raw: RawChannel): DM {
     name,
     isGroup,
     memberCount,
-    lastActivityAt: raw.lastMessageTimestamp ?? 0,
+    lastActivityAt: getChannelLastActivity(raw),
     unread: false,
   };
 }

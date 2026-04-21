@@ -49,6 +49,7 @@ describe("handleKey — conversation scrolling", () => {
       conversationLayout: {
         contentWidth: 36,
         messageRows: 4,
+        imagePreviewHeight: 4,
       },
     });
 
@@ -75,6 +76,7 @@ describe("handleKey — conversation scrolling", () => {
       conversationLayout: {
         contentWidth: 36,
         messageRows: 4,
+        imagePreviewHeight: 4,
       },
     });
 

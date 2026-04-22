@@ -154,7 +154,10 @@ export function App({ store, client, onExit }: AppProps) {
             reachedBeginning: older.length < HISTORY_PAGE_SIZE,
           });
         })
-        .catch((e) => logError("fetchHistory", e))
+        .catch((e) => {
+          store.dispatch({ type: "messages/setLoadingOlder", channelId, loading: false });
+          logError("fetchHistory", e);
+        })
         .finally(() => {
           fetchingOlder.current = false;
         });

@@ -23,7 +23,8 @@ function fakeClient() {
       async listDms() {
         return [];
       },
-      async fetchHistory() {
+      async fetchHistory(channelId: string, beforeId?: string, limit?: number) {
+        calls.push({ kind: "fetchHistory", args: [channelId, beforeId, limit] });
         return [] as Message[];
       },
       async send(channelId: string, content: string, attachments?: { path: string; name?: string }[]) {
@@ -199,5 +200,72 @@ describe("App", () => {
     await delay(0);
 
     expect(openImageInBrowser).not.toHaveBeenCalled();
+  });
+
+  it("clears loadingOlder after a failed older-history fetch so scrolling can retry", async () => {
+    const { client } = fakeClient();
+    const fetchHistory = vi
+      .spyOn(client, "fetchHistory")
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce([]);
+    const store = createStore({
+      ...initialState,
+      dms: {
+        "1": {
+          id: "1",
+          name: "alice",
+          isGroup: false,
+          memberCount: 1,
+          lastActivityAt: 1,
+          unread: false,
+        },
+      },
+      activeDmId: "1",
+      focus: "conversation",
+      connection: "connected",
+      conversations: {
+        "1": {
+          messages: [
+            {
+              id: "m1",
+              channelId: "1",
+              authorId: "u1",
+              authorName: "alice",
+              content: "latest",
+              createdAt: 0,
+              attachments: [],
+            },
+            {
+              id: "m2",
+              channelId: "1",
+              authorId: "u1",
+              authorName: "alice",
+              content: "newer",
+              createdAt: 1,
+              attachments: [],
+            },
+          ],
+          oldestFetchedId: "m1",
+          reachedBeginning: false,
+          loadingOlder: false,
+          scrollOffsetFromBottom: 1,
+          pendingNewCount: 0,
+        },
+      },
+    });
+    const app = render(<App store={store} client={client} />);
+
+    await delay(0);
+    app.stdin.write("k");
+    await delay(0);
+
+    expect(fetchHistory).toHaveBeenCalledTimes(1);
+    expect(store.getState().conversations["1"]?.loadingOlder).toBe(false);
+
+    app.stdin.write("k");
+    await delay(0);
+
+    expect(fetchHistory).toHaveBeenCalledTimes(2);
+    expect(store.getState().conversations["1"]?.loadingOlder).toBe(false);
   });
 });

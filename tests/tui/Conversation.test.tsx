@@ -44,7 +44,7 @@ describe("Conversation", () => {
     );
     const frame = lastFrame()!;
     expect(frame).toContain("alice");
-    expect(frame).toContain("14:22");
+    expect(frame).toContain("06:22");
     expect(frame).toContain("hey");
   });
 
@@ -167,7 +167,7 @@ describe("Conversation", () => {
     expect(frame).toContain("bob");
     expect(frame).toContain("one");
     expect(frame).toContain("five");
-    expect(frame).not.toContain("alice 14:22");
+    expect(frame).not.toContain("alice 06:22");
     expect(frame).not.toContain("older");
   });
 });

@@ -4,6 +4,7 @@ import { createCommandInput } from "./input.js";
 import { formatDmLabel, resolveDmQuery, resolveTarget, resolutionError } from "./resolver.js";
 import type { CommandInput, CommandResult, CommandSpec } from "./types.js";
 import { loadDmDirectory, loadDmMessages, sendDmMessage } from "../runtime/dm-actions.js";
+import { formatPacificTimestamp } from "../time/format.js";
 
 const MAX_MESSAGE_LIMIT = 100;
 const JSON_OPTION = { flags: "--json", description: "Emit JSON output" };
@@ -30,18 +31,13 @@ function listText(dms: DM[]): string {
 }
 
 function formatMessage(message: Message): string {
-  const timestamp = new Date(message.createdAt);
-  const stamp = `${timestamp.getFullYear()}-${pad(timestamp.getMonth() + 1)}-${pad(timestamp.getDate())} ${pad(timestamp.getHours())}:${pad(timestamp.getMinutes())}`;
+  const stamp = formatPacificTimestamp(message.createdAt);
   const body = message.content.trim()
     ? message.content.replace(/\s+/g, " ").trim()
     : message.attachments.length > 0
       ? message.attachments.map((a) => `[attachment: ${a.name}]`).join(" ")
       : "(empty)";
   return `[${stamp}] ${message.authorName}: ${body}`;
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
 }
 
 function parseLimit(input: CommandInput): number | CommandResult {

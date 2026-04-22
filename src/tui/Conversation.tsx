@@ -4,6 +4,7 @@ import type { ConversationView, Message, Attachment } from "../store/types.js";
 import { placeholderFor } from "../image/render.js";
 import { truncateText } from "./text.js";
 import { getConversationWindow } from "./conversation-window.js";
+import { formatPacificClockTime } from "../time/format.js";
 
 interface Props {
   view: ConversationView | null;
@@ -68,7 +69,7 @@ function MessageLine({
   contentWidth: number;
   imageShortcutLabels?: ReadonlyMap<string, string>;
 }) {
-  const time = new Date(m.createdAt).toISOString().slice(11, 16);
+  const time = formatPacificClockTime(m.createdAt);
   return (
     <Box flexDirection="column">
       <Text>

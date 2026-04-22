@@ -9,6 +9,7 @@ const MAX_MESSAGE_LIMIT = 100;
 const JSON_OPTION = { flags: "--json", description: "Emit JSON output" };
 const DM_OPTION = { flags: "--dm <query>", description: "Target a DM by name or list index" };
 const CHANNEL_ID_OPTION = { flags: "--channel-id <id>", description: "Target a DM by channel id" };
+const BEFORE_OPTION = { flags: "--before <id>", description: "Fetch messages before this message ID" };
 
 function ok(text: string, data?: Record<string, unknown>): CommandResult {
   return { ok: true, text, data, exitCode: 0 };
@@ -219,11 +220,12 @@ const specs: CommandSpec[] = [
     usage: "messages [limit] [--dm <query> | --channel-id <id>] [--json]",
     cli: {
       arguments: ["[limit]"],
-      options: [DM_OPTION, CHANNEL_ID_OPTION, JSON_OPTION],
+      options: [DM_OPTION, CHANNEL_ID_OPTION, BEFORE_OPTION, JSON_OPTION],
       buildInput: (args, options) =>
         createCommandInput("messages", stringArg(args[0]) ? [stringArg(args[0])!] : [], {
           dm: stringArg(options.dm),
           "channel-id": stringArg(options.channelId),
+          before: stringArg(options.before),
           json: !!options.json,
         }),
     },
@@ -234,9 +236,11 @@ const specs: CommandSpec[] = [
       if (typeof limit !== "number") return limit;
       const target = resolveTarget(input, ctx);
       if (!target.ok) return target.result;
+      const beforeId = typeof input.flags["before"] === "string" ? input.flags["before"] : undefined;
       const messages = await loadDmMessages(ctx.client!, {
         channelId: target.target.channelId,
         limit,
+        beforeId,
       });
       return ok(messages.length === 0 ? "no messages" : messages.map(formatMessage).join("\n"), {
         command: "messages",

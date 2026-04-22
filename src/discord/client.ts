@@ -1,4 +1,5 @@
 import { Client, type TextBasedChannel } from "discord.js-selfbot-v13";
+import { basename } from "node:path";
 import { normalizeChannel, normalizeMessage } from "./events.js";
 import type { DM, Message } from "../store/types.js";
 import type { RawChannel, RawMessage } from "./types.js";
@@ -16,7 +17,7 @@ export interface DiscordClient {
   logout(): Promise<void>;
   listDms(): Promise<DM[]>;
   fetchHistory(channelId: string, beforeId?: string, limit?: number): Promise<Message[]>;
-  send(channelId: string, content: string): Promise<void>;
+  send(channelId: string, content: string, attachments?: { path: string; name?: string }[]): Promise<void>;
   on<K extends keyof DiscordEvents>(event: K, handler: DiscordEvents[K]): void;
 }
 
@@ -76,10 +77,20 @@ export function createDiscordClient(): DiscordClient {
       const raws = Array.from(collection.values()) as unknown as RawMessage[];
       return raws.map(normalizeMessage);
     },
-    async send(channelId, content) {
+    async send(channelId, content, attachments = []) {
       const ch = (await client.channels.fetch(channelId)) as TextBasedChannel | null;
       if (!ch || !("send" in ch)) throw new Error(`channel ${channelId} not sendable`);
-      await ch.send(content);
+      if (attachments.length === 0) {
+        await ch.send(content);
+        return;
+      }
+      await ch.send({
+        content: content || undefined,
+        files: attachments.map((attachment) => ({
+          attachment: attachment.path,
+          name: attachment.name ?? basename(attachment.path),
+        })),
+      });
     },
     on(event, handler) {
       handlers[event] = handler as never;

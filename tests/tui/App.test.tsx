@@ -1,9 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render } from "ink-testing-library";
+import { setTimeout as delay } from "node:timers/promises";
 import { App } from "../../src/tui/App.js";
 import { createStore } from "../../src/store/store.js";
 import { initialState, type Message } from "../../src/store/types.js";
+import { openImageInBrowser } from "../../src/image/open.js";
+
+vi.mock("../../src/image/open.js", () => ({
+  openImageInBrowser: vi.fn(async () => undefined),
+}));
 
 function fakeClient() {
   const calls: Array<{ kind: string; args: unknown[] }> = [];
@@ -20,8 +26,8 @@ function fakeClient() {
       async fetchHistory() {
         return [] as Message[];
       },
-      async send(channelId: string, content: string) {
-        calls.push({ kind: "send", args: [channelId, content] });
+      async send(channelId: string, content: string, attachments?: { path: string; name?: string }[]) {
+        calls.push({ kind: "send", args: [channelId, content, attachments ?? []] });
       },
       on() {},
     },
@@ -29,6 +35,10 @@ function fakeClient() {
 }
 
 describe("App", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders with a preloaded store (DM list + empty conversation)", () => {
     const store = createStore({
       ...initialState,
@@ -43,6 +53,7 @@ describe("App", () => {
         },
       },
       activeDmId: "1",
+      focus: "conversation",
       connection: "connected",
     });
     const { client } = fakeClient();
@@ -90,5 +101,103 @@ describe("App", () => {
     expect(store.getState().activeDmId).toBe("2");
     expect(frame).toContain("bob squad");
     expect(frame).not.toContain("alice");
+  });
+
+  it("opens the visible numbered image when a digit is pressed in conversation focus", async () => {
+    const store = createStore({
+      ...initialState,
+      dms: {
+        "1": {
+          id: "1",
+          name: "alice",
+          isGroup: false,
+          memberCount: 1,
+          lastActivityAt: 1,
+          unread: false,
+        },
+      },
+      activeDmId: "1",
+      focus: "conversation",
+      connection: "connected",
+      conversations: {
+        "1": {
+          messages: [
+            {
+              id: "m1",
+              channelId: "1",
+              authorId: "u1",
+              authorName: "alice",
+              content: "",
+              createdAt: 0,
+              attachments: [
+                { id: "a1", name: "pic.png", url: "https://img.test/1", contentType: "image/png", size: 10 },
+              ],
+            },
+          ],
+          oldestFetchedId: "m1",
+          reachedBeginning: false,
+          loadingOlder: false,
+          scrollOffsetFromBottom: 0,
+          pendingNewCount: 0,
+        },
+      },
+    });
+    const { client } = fakeClient();
+    const app = render(<App store={store} client={client} />);
+
+    await delay(0);
+    expect(app.lastFrame()).toContain("[1]");
+    app.stdin.write("1");
+    await delay(0);
+
+    expect(openImageInBrowser).toHaveBeenCalledWith("https://img.test/1");
+  });
+
+  it("ignores digit presses outside conversation focus", async () => {
+    const store = createStore({
+      ...initialState,
+      dms: {
+        "1": {
+          id: "1",
+          name: "alice",
+          isGroup: false,
+          memberCount: 1,
+          lastActivityAt: 1,
+          unread: false,
+        },
+      },
+      activeDmId: "1",
+      focus: "list",
+      connection: "connected",
+      conversations: {
+        "1": {
+          messages: [
+            {
+              id: "m1",
+              channelId: "1",
+              authorId: "u1",
+              authorName: "alice",
+              content: "",
+              createdAt: 0,
+              attachments: [
+                { id: "a1", name: "pic.png", url: "https://img.test/1", contentType: "image/png", size: 10 },
+              ],
+            },
+          ],
+          oldestFetchedId: "m1",
+          reachedBeginning: false,
+          loadingOlder: false,
+          scrollOffsetFromBottom: 0,
+          pendingNewCount: 0,
+        },
+      },
+    });
+    const { client } = fakeClient();
+    const app = render(<App store={store} client={client} />);
+
+    app.stdin.write("1");
+    await delay(0);
+
+    expect(openImageInBrowser).not.toHaveBeenCalled();
   });
 });

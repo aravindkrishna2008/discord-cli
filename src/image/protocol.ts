@@ -11,3 +11,11 @@ export function resolveProtocol(
   if (env.TERM === "xterm-kitty" || env.KITTY_WINDOW_ID) return "kitty";
   return "halfblock";
 }
+
+export function resolveProtocolForInk(
+  choice: ImageProtocol,
+  env: NodeJS.ProcessEnv,
+): RenderProtocol {
+  const protocol = resolveProtocol(choice, env);
+  return protocol === "iterm" || protocol === "kitty" ? "halfblock" : protocol;
+}

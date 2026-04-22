@@ -1,9 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { ConversationView, Message, Attachment } from "../store/types.js";
-import { getImagePreviewHeight, placeholderFor } from "../image/render.js";
-import type { ImageProtocol } from "../config/config.js";
-import { ImageView } from "./ImageView.js";
+import { placeholderFor } from "../image/render.js";
 import { truncateText } from "./text.js";
 import { getConversationWindow } from "./conversation-window.js";
 
@@ -11,24 +9,22 @@ interface Props {
   view: ConversationView | null;
   title: string;
   focused: boolean;
-  imageProtocol: ImageProtocol;
   width: number;
   height: number;
+  imageShortcutLabels?: ReadonlyMap<string, string>;
 }
 
-export function Conversation({ view, title, focused, imageProtocol, width, height }: Props) {
+export function Conversation({ view, title, focused, width, height, imageShortcutLabels }: Props) {
   const innerWidth = Math.max(1, width - 4);
   const loadingRows = view?.loadingOlder ? 1 : 0;
   const pendingRows = view && view.scrollOffsetFromBottom > 0 && view.pendingNewCount > 0 ? 1 : 0;
   const messageRows = Math.max(0, height - 4 - loadingRows - pendingRows);
-  const imagePreviewHeight = getImagePreviewHeight(messageRows);
   const visibleMessages = view
     ? getConversationWindow(
         view.messages,
         innerWidth,
         messageRows,
         view.scrollOffsetFromBottom,
-        imagePreviewHeight,
       ).visibleMessages
     : [];
 
@@ -51,9 +47,8 @@ export function Conversation({ view, title, focused, imageProtocol, width, heigh
           <MessageLine
             key={m.id}
             m={m}
-            imageProtocol={imageProtocol}
             contentWidth={innerWidth}
-            imagePreviewHeight={imagePreviewHeight}
+            imageShortcutLabels={imageShortcutLabels}
           />
         ))
       )}
@@ -66,14 +61,12 @@ export function Conversation({ view, title, focused, imageProtocol, width, heigh
 
 function MessageLine({
   m,
-  imageProtocol,
   contentWidth,
-  imagePreviewHeight,
+  imageShortcutLabels,
 }: {
   m: Message;
-  imageProtocol: ImageProtocol;
   contentWidth: number;
-  imagePreviewHeight: number;
+  imageShortcutLabels?: ReadonlyMap<string, string>;
 }) {
   const time = new Date(m.createdAt).toISOString().slice(11, 16);
   return (
@@ -85,12 +78,11 @@ function MessageLine({
       {m.content ? <Text>  {m.content}</Text> : null}
       {m.attachments.map((a) =>
         a.contentType?.startsWith("image/") ? (
-          <ImageView
+          <ImageAttachmentLine
             key={a.id}
             a={a}
-            protocolChoice={imageProtocol}
             contentWidth={contentWidth}
-            maxHeight={imagePreviewHeight}
+            shortcutLabel={imageShortcutLabels?.get(a.id) ?? null}
           />
         ) : (
           <AttachmentLine key={a.id} a={a} />
@@ -102,4 +94,24 @@ function MessageLine({
 
 function AttachmentLine({ a }: { a: Attachment }) {
   return <Text color="gray">  {placeholderFor(a.name, a.size)}</Text>;
+}
+
+function ImageAttachmentLine({
+  a,
+  contentWidth,
+  shortcutLabel,
+}: {
+  a: Attachment;
+  contentWidth: number;
+  shortcutLabel: string | null;
+}) {
+  const prefix = shortcutLabel ? `  ${shortcutLabel} ` : "      ";
+  const body = `${a.name} · ${formatBytes(a.size)}`;
+  return <Text color="cyan">{truncateText(prefix + body, contentWidth)}</Text>;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n}B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
+  return `${(n / 1024 / 1024).toFixed(1)}MB`;
 }

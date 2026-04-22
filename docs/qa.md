@@ -7,7 +7,7 @@ Automated tests cover the pure logic; the following flows need a real Discord ac
 - `npm install`
 - `npx playwright install chromium` (for browser login)
 - A Discord account with at least one DM and one group DM
-- Terminal: iTerm2 or Kitty recommended for inline images
+- Terminal: any terminal supported by Ink; browser opening should work on macOS
 
 ## Login
 
@@ -49,12 +49,12 @@ Automated tests cover the pure logic; the following flows need a real Discord ac
 - [ ] A send failure shows `! <error>` under the input
 - [ ] `Esc` returns to normal mode and clears any send error
 
-## Inline images
+## Image shortcuts
 
-- [ ] In iTerm2 with `imageProtocol: "auto"`, image attachments render inline
-- [ ] In Kitty, image attachments render inline
-- [ ] In a non-image terminal, attachments fall back to `[image: name (size)]`
-- [ ] Setting `imageProtocol: "none"` in `~/.discord-cli/config.json` disables rendering
+- [ ] Visible image attachments render as numbered rows like `[1] image.png`
+- [ ] Pressing `1` through `9` opens the matching visible image in the browser
+- [ ] If more than 9 images are visible, only the first 9 are numbered
+- [ ] Non-image attachments do not receive numeric shortcuts
 
 ## Exit + error log
 

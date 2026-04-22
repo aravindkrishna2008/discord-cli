@@ -27,7 +27,7 @@ const view = (messages: Message[], extra: Partial<ConversationView> = {}): Conve
 describe("Conversation", () => {
   it("renders empty-state text", () => {
     const { lastFrame } = render(
-      <Conversation view={null} title="alice" focused imageProtocol="none" width={40} height={10} />,
+      <Conversation view={null} title="alice" focused width={40} height={10} />,
     );
     expect(lastFrame()).toContain("no messages");
   });
@@ -38,7 +38,6 @@ describe("Conversation", () => {
         view={view([msg({ id: "m1", content: "hey" })])}
         title="alice"
         focused
-        imageProtocol="none"
         width={40}
         height={10}
       />,
@@ -49,7 +48,7 @@ describe("Conversation", () => {
     expect(frame).toContain("hey");
   });
 
-  it("renders image attachment placeholder", () => {
+  it("renders numbered image attachment rows", () => {
     const m = msg({
       id: "m1",
       attachments: [
@@ -57,9 +56,32 @@ describe("Conversation", () => {
       ],
     });
     const { lastFrame } = render(
-      <Conversation view={view([m])} title="alice" focused imageProtocol="none" width={40} height={10} />,
+      <Conversation
+        view={view([m])}
+        title="alice"
+        focused
+        width={40}
+        height={10}
+        imageShortcutLabels={new Map([["a", "[1]"]])}
+      />,
     );
-    expect(lastFrame()).toContain("[image: pic.png");
+    const frame = lastFrame()!;
+    expect(frame).toContain("[1]");
+    expect(frame).toContain("pic.png");
+  });
+
+  it("renders unnumbered image rows when no shortcut is assigned", () => {
+    const m = msg({
+      id: "m1",
+      attachments: [
+        { id: "a", name: "pic.png", url: "u", contentType: "image/png", size: 2048 },
+      ],
+    });
+    const { lastFrame } = render(
+      <Conversation view={view([m])} title="alice" focused width={40} height={10} />,
+    );
+    expect(lastFrame()).toContain("pic.png");
+    expect(lastFrame()).not.toContain("[1]");
   });
 
   it("shows 'loading older messages' indicator when fetching", () => {
@@ -68,7 +90,6 @@ describe("Conversation", () => {
         view={view([msg({ id: "m1" })], { loadingOlder: true })}
         title="alice"
         focused
-        imageProtocol="none"
         width={40}
         height={10}
       />,
@@ -82,7 +103,6 @@ describe("Conversation", () => {
         view={view([msg({ id: "m1" })], { scrollOffsetFromBottom: 5, pendingNewCount: 2 })}
         title="alice"
         focused
-        imageProtocol="none"
         width={40}
         height={10}
       />,
@@ -100,7 +120,6 @@ describe("Conversation", () => {
         ])}
         title="alice"
         focused
-        imageProtocol="none"
         width={40}
         height={8}
       />,
@@ -121,7 +140,6 @@ describe("Conversation", () => {
         ], { scrollOffsetFromBottom: 1 })}
         title="alice"
         focused
-        imageProtocol="none"
         width={40}
         height={8}
       />,
@@ -130,5 +148,26 @@ describe("Conversation", () => {
     expect(frame).toContain("first");
     expect(frame).toContain("second");
     expect(frame).not.toContain("third");
+  });
+
+  it("does not render older messages when the latest multiline message fills the viewport", () => {
+    const { lastFrame } = render(
+      <Conversation
+        view={view([
+          msg({ id: "m1", authorName: "alice", content: "older" }),
+          msg({ id: "m2", authorName: "bob", content: "one\ntwo\nthree\nfour\nfive" }),
+        ])}
+        title="alice"
+        focused
+        width={40}
+        height={10}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("bob");
+    expect(frame).toContain("one");
+    expect(frame).toContain("five");
+    expect(frame).not.toContain("alice 14:22");
+    expect(frame).not.toContain("older");
   });
 });

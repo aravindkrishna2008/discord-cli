@@ -16,6 +16,7 @@ describe("Input", () => {
       <Input
         mode="insert"
         value="hello"
+        attachmentSummary={null}
         sendError={null}
         width={40}
         onChange={() => {}}
@@ -30,6 +31,7 @@ describe("Input", () => {
       <Input
         mode="insert"
         value=""
+        attachmentSummary={null}
         sendError="nope"
         width={40}
         onChange={() => {}}
@@ -37,5 +39,20 @@ describe("Input", () => {
       />,
     );
     expect(lastFrame()).toContain("nope");
+  });
+
+  it("renders the attachment summary below input", () => {
+    const { lastFrame } = render(
+      <Input
+        mode="insert"
+        value=""
+        attachmentSummary="[Image: photo.png]"
+        sendError={null}
+        width={40}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(lastFrame()).toContain("[Image: photo.png]");
   });
 });

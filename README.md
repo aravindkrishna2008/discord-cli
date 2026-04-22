@@ -1,6 +1,6 @@
 # discord-cli
 
-Terminal Discord client for DMs. Two-pane Ink TUI with vim-style keybinds, inline image rendering, and a Playwright-assisted login flow.
+Terminal Discord client for DMs. Two-pane Ink TUI with vim-style keybinds, numbered image shortcuts, and a Playwright-assisted login flow.
 
 > ⚠️ Uses a selfbot (user-token) library. This violates Discord's Terms of Service and can get your account flagged or banned. Use at your own risk.
 
@@ -82,7 +82,7 @@ State lives under `~/.discord-cli/`:
 }
 ```
 
-`imageProtocol`: `"auto" | "iterm" | "kitty" | "halfblock" | "none"`. `auto` picks iTerm2 or Kitty when detected, otherwise half-block.
+`imageProtocol`: legacy image-rendering setting retained for compatibility. Received images now render as numbered rows in the conversation and open in your browser via the shortcuts below.
 
 ## Keybinds
 
@@ -93,6 +93,7 @@ State lives under `~/.discord-cli/`:
 | `j` / `k` / `↓` / `↑` | Move selection (list) or scroll (conversation) |
 | `h` / `←` | Focus DM list |
 | `l` / `→` / `Enter` | Focus conversation |
+| `1` - `9` | Open the matching visible numbered image in your browser |
 | `i` | Insert mode (compose) |
 | `a-z0-9 ` | Filter DM list |
 | `Esc` | Clear filter |
@@ -103,9 +104,15 @@ State lives under `~/.discord-cli/`:
 | Key | Action |
 | --- | --- |
 | `Enter` | Send message |
+| Drag/drop image file | Queue the image for upload |
+| `Cmd+V` from Finder | Queue pasted file paths as image uploads |
+| `Ctrl+V` | Read the macOS clipboard image and queue it for upload |
+| `Backspace` on empty input | Remove the last queued image |
 | `Esc` | Back to normal mode |
 
 Scroll to the top of a conversation to load older messages (50 at a time).
+
+Visible image attachments are numbered in the conversation pane as `[1]` through `[9]`. The numbering only applies to images currently on screen.
 
 ## Development
 

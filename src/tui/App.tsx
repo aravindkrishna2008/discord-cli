@@ -10,13 +10,16 @@ import { selectActiveConversation, selectDmList } from "../store/selectors.js";
 import { handleKey } from "./keybinds.js";
 import { useStore } from "./useStore.js";
 import { logError } from "../errors/logger.js";
-import { loadConfig } from "../config/config.js";
-import { paths } from "../config/paths.js";
-import { getImagePreviewHeight } from "../image/render.js";
 import { createSession } from "../runtime/session.js";
 import { HISTORY_PAGE_SIZE, loadDmMessages, sendDmMessage } from "../runtime/dm-actions.js";
-
-const config = loadConfig(paths.configFile);
+import {
+  consumeImageAttachmentInput,
+  type PendingAttachment,
+  resolvePendingAttachments,
+} from "./compose-attachments.js";
+import { readClipboardImagePaths, readClipboardText } from "./clipboard-image.js";
+import { openImageInBrowser } from "../image/open.js";
+import { getVisibleImageShortcuts } from "./conversation-window.js";
 type Mode = "normal" | "insert" | "search";
 
 interface AppProps {
@@ -33,16 +36,36 @@ export function App({ store, client, onExit }: AppProps) {
   const conv = useMemo(() => selectActiveConversation(state), [state]);
   const [mode, setMode] = useState<Mode>("normal");
   const [buffer, setBuffer] = useState("");
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const bufferRef = useRef(buffer);
+  const pendingAttachmentsRef = useRef(pendingAttachments);
   const fetchingOlder = useRef(false);
+  const attachingClipboard = useRef(false);
   const [terminalSize, setTerminalSize] = useState(() => getTerminalSize(stdout));
   const footerHeight = 1;
   const mainHeight = Math.max(2, terminalSize.height - footerHeight);
-  const desiredInputHeight = state.sendError ? 2 : 1;
+  const desiredInputHeight = 1 + (pendingAttachments.length > 0 ? 1 : 0) + (state.sendError ? 1 : 0);
   const inputHeight = Math.min(desiredInputHeight, Math.max(1, mainHeight - 1));
   const conversationHeight = Math.max(1, mainHeight - inputHeight);
   const listWidth = getListWidth(terminalSize.width);
   const conversationWidth = Math.max(1, terminalSize.width - listWidth);
   const conversationLayout = getConversationLayout(conversationWidth, conversationHeight, conv);
+  const visibleImageShortcuts = useMemo(
+    () =>
+      conv
+        ? getVisibleImageShortcuts(
+            conv.messages,
+            conversationLayout.contentWidth,
+            conversationLayout.messageRows,
+            conv.scrollOffsetFromBottom,
+          )
+        : [],
+    [conv, conversationLayout.contentWidth, conversationLayout.messageRows],
+  );
+  const imageShortcutLabels = useMemo(
+    () => new Map(visibleImageShortcuts.map((item) => [item.attachmentId, `[${item.digit}]`])),
+    [visibleImageShortcuts],
+  );
 
   useEffect(() => {
     const handleResize = () => setTerminalSize(getTerminalSize(stdout));
@@ -59,6 +82,30 @@ export function App({ store, client, onExit }: AppProps) {
 
   useInput((input, key) => {
     if (mode === "insert") {
+      if (
+        state.activeDmId &&
+        !attachingClipboard.current &&
+        ((key.ctrl && input === "v") || (key.meta && input.toLowerCase() === "v") || input === "\u0016")
+      ) {
+        attachingClipboard.current = true;
+        void attachClipboardImage()
+          .catch((e) => {
+            store.dispatch({ type: "sendError/set", message: (e as Error).message });
+          })
+          .finally(() => {
+            attachingClipboard.current = false;
+          });
+        return;
+      }
+      if (
+        key.backspace &&
+        bufferRef.current.length === 0 &&
+        pendingAttachmentsRef.current.length > 0
+      ) {
+        replacePendingAttachments(pendingAttachmentsRef.current.slice(0, -1));
+        store.dispatch({ type: "sendError/set", message: null });
+        return;
+      }
       if (key.escape) {
         setMode("normal");
         store.dispatch({ type: "sendError/set", message: null });
@@ -71,6 +118,19 @@ export function App({ store, client, onExit }: AppProps) {
         store.dispatch({ type: "filter/set", value: "" });
       }
       return;
+    }
+    if (
+      mode === "normal" &&
+      state.focus === "conversation" &&
+      /^[1-9]$/.test(input)
+    ) {
+      const match = visibleImageShortcuts.find((item) => item.digit === input);
+      if (match) {
+        void openImageInBrowser(match.url).catch((e) => {
+          store.dispatch({ type: "sendError/set", message: (e as Error).message });
+        });
+        return;
+      }
     }
     if (input === "/") {
       setMode("search");
@@ -125,6 +185,10 @@ export function App({ store, client, onExit }: AppProps) {
 
   const active = state.activeDmId ? state.dms[state.activeDmId] : null;
   const listFocused = mode === "search" || state.focus === "list";
+  const attachmentSummary =
+    pendingAttachments.length === 0
+      ? null
+      : pendingAttachments.map((attachment) => `[Image: ${attachment.name}]`).join(" ");
 
   return (
     <Box
@@ -155,23 +219,44 @@ export function App({ store, client, onExit }: AppProps) {
             view={conv}
             title={active?.name ?? "(no DM)"}
             focused={state.focus === "conversation"}
-            imageProtocol={config.imageProtocol}
             width={conversationWidth}
             height={conversationHeight}
+            imageShortcutLabels={imageShortcutLabels}
           />
           <Input
             mode={mode}
             value={buffer}
+            attachmentSummary={attachmentSummary}
             sendError={state.sendError}
             width={conversationWidth}
-            onChange={setBuffer}
+            onChange={(nextValue) => {
+              const attachmentInput = consumeImageAttachmentInput(nextValue, bufferRef.current);
+              if (attachmentInput) {
+                appendPendingAttachments(attachmentInput.attachments);
+                replaceBuffer(attachmentInput.buffer);
+                store.dispatch({ type: "sendError/set", message: null });
+                return;
+              }
+              replaceBuffer(nextValue);
+            }}
             onSubmit={() => {
-              const content = buffer.trim();
-              if (!content || !state.activeDmId) return;
+              const content = bufferRef.current.trim();
+              const attachments = pendingAttachmentsRef.current.map((attachment) => ({
+                path: attachment.path,
+                name: attachment.name,
+              }));
+              if ((!content && attachments.length === 0) || !state.activeDmId) return;
               const channelId = state.activeDmId;
-              setBuffer("");
+              const draftBuffer = bufferRef.current;
+              const draftAttachments = pendingAttachmentsRef.current;
+              replaceBuffer("");
+              replacePendingAttachments([]);
               setMode("normal");
-              sendDmMessage(client, { channelId, content }).catch((e) => {
+              store.dispatch({ type: "sendError/set", message: null });
+              sendDmMessage(client, { channelId, content, attachments }).catch((e) => {
+                replaceBuffer(draftBuffer);
+                replacePendingAttachments(draftAttachments);
+                setMode("insert");
                 store.dispatch({ type: "sendError/set", message: (e as Error).message });
               });
             }}
@@ -181,6 +266,42 @@ export function App({ store, client, onExit }: AppProps) {
       <Footer connection={state.connection} mode={mode} width={terminalSize.width} />
     </Box>
   );
+
+  async function attachClipboardImage(): Promise<void> {
+    const clipboardText = await readClipboardText().catch(() => "");
+    if (clipboardText.trim().length > 0) {
+      const consumed = consumeImageAttachmentInput(clipboardText, "");
+      if (consumed && consumed.attachments.length > 0) {
+        appendPendingAttachments(consumed.attachments);
+        store.dispatch({ type: "sendError/set", message: null });
+        return;
+      }
+    }
+
+    const clipboardPaths = await readClipboardImagePaths();
+    const attachments = resolvePendingAttachments(clipboardPaths);
+    if (attachments.length === 0) {
+      throw new Error("clipboard does not contain an image file or bitmap image");
+    }
+    appendPendingAttachments(attachments);
+    store.dispatch({ type: "sendError/set", message: null });
+  }
+
+  function replaceBuffer(nextBuffer: string): void {
+    bufferRef.current = nextBuffer;
+    setBuffer(nextBuffer);
+  }
+
+  function replacePendingAttachments(nextAttachments: PendingAttachment[]): void {
+    pendingAttachmentsRef.current = nextAttachments;
+    setPendingAttachments(nextAttachments);
+  }
+
+  function appendPendingAttachments(nextAttachments: PendingAttachment[]): void {
+    replacePendingAttachments(
+      mergeAttachments(pendingAttachmentsRef.current, nextAttachments),
+    );
+  }
 }
 
 export async function runTui(): Promise<void> {
@@ -236,7 +357,7 @@ function getConversationLayout(
   width: number,
   height: number,
   view: ReturnType<typeof selectActiveConversation>,
-): { contentWidth: number; messageRows: number; imagePreviewHeight: number } {
+): { contentWidth: number; messageRows: number } {
   const contentWidth = Math.max(1, width - 4);
   const loadingRows = view?.loadingOlder ? 1 : 0;
   const pendingRows = view && view.scrollOffsetFromBottom > 0 && view.pendingNewCount > 0 ? 1 : 0;
@@ -244,6 +365,19 @@ function getConversationLayout(
   return {
     contentWidth,
     messageRows,
-    imagePreviewHeight: getImagePreviewHeight(messageRows),
   };
+}
+
+function mergeAttachments(
+  current: PendingAttachment[],
+  incoming: PendingAttachment[],
+): PendingAttachment[] {
+  const seen = new Set(current.map((attachment) => attachment.path));
+  const next = [...current];
+  for (const attachment of incoming) {
+    if (seen.has(attachment.path)) continue;
+    seen.add(attachment.path);
+    next.push(attachment);
+  }
+  return next;
 }

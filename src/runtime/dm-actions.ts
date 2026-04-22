@@ -3,6 +3,11 @@ import type { DM, Message } from "../store/types.js";
 
 export const HISTORY_PAGE_SIZE = 50;
 
+export interface OutgoingAttachment {
+  path: string;
+  name?: string;
+}
+
 export async function loadDmDirectory(client: DiscordClient): Promise<DM[]> {
   return client.listDms();
 }
@@ -16,7 +21,7 @@ export async function loadDmMessages(
 
 export async function sendDmMessage(
   client: DiscordClient,
-  opts: { channelId: string; content: string },
+  opts: { channelId: string; content: string; attachments?: OutgoingAttachment[] },
 ): Promise<void> {
-  await client.send(opts.channelId, opts.content);
+  await client.send(opts.channelId, opts.content, opts.attachments ?? []);
 }

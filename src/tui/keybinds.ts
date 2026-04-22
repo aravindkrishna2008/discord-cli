@@ -10,7 +10,6 @@ export interface KeyContext {
   conversationLayout?: {
     contentWidth: number;
     messageRows: number;
-    imagePreviewHeight: number;
   };
 }
 
@@ -79,12 +78,11 @@ export function handleKey(ctx: KeyContext): KeyOutcome {
 
   if (input === "k" || key.upArrow) {
     const atTopOfLoadedMessages = conversationLayout
-      ? isAtTopOfLoadedMessages(
+        ? isAtTopOfLoadedMessages(
           conv.messages,
           conversationLayout.contentWidth,
           conversationLayout.messageRows,
           conv.scrollOffsetFromBottom,
-          conversationLayout.imagePreviewHeight,
         )
       : conv.scrollOffsetFromBottom >= Math.max(0, conv.messages.length - 1);
     if (atTopOfLoadedMessages) {

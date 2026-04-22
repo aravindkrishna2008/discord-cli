@@ -12,7 +12,7 @@ export function Footer({ connection, mode, width }: Props) {
   const light = connection === "connected" ? "\u25CF" : "\u25CB";
   const hints =
     mode === "insert"
-      ? "Enter: send · Esc: normal"
+      ? "Enter: send · Drag/drop: attach · Ctrl+V: clipboard · Esc: normal"
       : mode === "search"
         ? "Type to search · Enter: done · Esc: clear"
       : "j/k: nav · Enter: open · i: type · /: filter · q: quit";

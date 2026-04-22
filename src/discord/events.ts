@@ -1,6 +1,14 @@
 import type { DM, Message } from "../store/types.js";
 import type { RawAttachment, RawChannel, RawMessage } from "./types.js";
 
+function displayUserName(user: {
+  username: string;
+  globalName?: string | null;
+  friendNickname?: string | null;
+}): string {
+  return user.friendNickname ?? user.globalName ?? user.username;
+}
+
 function attachmentsArray(
   a: RawMessage["attachments"],
 ): RawAttachment[] {
@@ -13,7 +21,7 @@ export function normalizeMessage(raw: RawMessage): Message {
     id: raw.id,
     channelId: raw.channelId,
     authorId: raw.author.id,
-    authorName: raw.author.globalName ?? raw.author.username,
+    authorName: displayUserName(raw.author),
     content: raw.content,
     createdAt: raw.createdTimestamp,
     attachments: attachmentsArray(raw.attachments).map((a) => ({
@@ -47,7 +55,7 @@ export function normalizeChannel(raw: RawChannel): DM {
   const isGroup = raw.type === "GROUP_DM";
   const name = isGroup
     ? raw.name ?? "(group)"
-    : raw.recipient?.globalName ?? raw.recipient?.username ?? "(unknown)";
+    : raw.recipient ? displayUserName(raw.recipient) : "(unknown)";
   const memberCount = isGroup ? raw.recipients?.size ?? 0 : 1;
   return {
     id: raw.id,

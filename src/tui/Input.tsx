@@ -6,13 +6,22 @@ import { truncateText } from "./text.js";
 interface Props {
   mode: "normal" | "insert" | "search";
   value: string;
+  attachmentSummary?: string | null;
   sendError: string | null;
   width: number;
   onChange(v: string): void;
   onSubmit(): void;
 }
 
-export function Input({ mode, value, sendError, width, onChange, onSubmit }: Props) {
+export function Input({
+  mode,
+  value,
+  attachmentSummary,
+  sendError,
+  width,
+  onChange,
+  onSubmit,
+}: Props) {
   return (
     <Box flexDirection="column" width={width} overflow="hidden">
       <Box width={width} overflow="hidden">
@@ -23,6 +32,9 @@ export function Input({ mode, value, sendError, width, onChange, onSubmit }: Pro
           <Text color="gray">{truncateText("press i to type", Math.max(1, width - 2))}</Text>
         )}
       </Box>
+      {attachmentSummary ? (
+        <Text color="cyan">{truncateText(`+ ${attachmentSummary}`, Math.max(1, width - 2))}</Text>
+      ) : null}
       {sendError ? <Text color="red">! {truncateText(sendError, Math.max(1, width - 2))}</Text> : null}
     </Box>
   );

@@ -26,6 +26,18 @@ describe("normalizeMessage", () => {
     });
   });
 
+  it("prefers a friend nickname over global name and username", () => {
+    const out = normalizeMessage({
+      id: "m1",
+      channelId: "c1",
+      author: { id: "u1", username: "alice", globalName: "Alice", friendNickname: "Bestie" },
+      content: "hi",
+      createdTimestamp: 1,
+      attachments: [],
+    });
+    expect(out.authorName).toBe("Bestie");
+  });
+
   it("falls back to username when globalName is missing", () => {
     const out = normalizeMessage({
       id: "m1",
@@ -52,6 +64,17 @@ describe("normalizeMessage", () => {
 });
 
 describe("normalizeChannel", () => {
+  it("prefers a friend nickname for a 1:1 DM", () => {
+    const dm = normalizeChannel({
+      id: "c1",
+      type: "DM",
+      name: null,
+      recipient: { username: "bob", globalName: "Bob", friendNickname: "Bobby" },
+      lastMessageTimestamp: 42,
+    });
+    expect(dm.name).toBe("Bobby");
+  });
+
   it("names a 1:1 DM after the other recipient", () => {
     const dm = normalizeChannel({
       id: "c1",
